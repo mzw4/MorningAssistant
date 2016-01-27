@@ -68,9 +68,10 @@ class Bot():
                     if not self.clap_detector.running():
                         self.clap_detector.start()
                     self.check_clap()
-
                     if not self.speech_q.empty():
                         self.speak(self.speech_q.get())
+                    else:
+                        self.state = States.Idle
                 else:
                     pass
 
@@ -90,8 +91,8 @@ class Bot():
     """
     def check_clap(self):
         if not self.thread_queue.empty() and self.thread_queue.get() == 'clap':
+            self.thread_queue.queue.clear()
             self.stop_talking()
-            # self.clap_detector.start()
             self.receive_command()
 
     def listen(self):
@@ -105,11 +106,22 @@ class Bot():
     def receive_command(self):
         # response = self.listen()
         self.speak('What can I do for you?')
+        self.speech_q.queue.clear()
         response = None
         while not response:
             response = self.voice_parser.listen()
-        
         print response
+        
+        if response == "what's your name":
+            self.queue_speech('My name is Faraday')
+            self.state = States.Speaking
+        elif response == 'who are you':
+            self.queue_speech('I am your friend')
+            self.state = States.Speaking
+        elif response == 'are you a robot':
+            self.queue_speech('Yes')
+            self.state = States.Speaking
+
         if 'news' in response:
             self.read_news()
 
@@ -150,6 +162,7 @@ class Bot():
 
     # add speech to the queue for consumption
     def queue_speech(self, text):
+        print 'queuing'
         self.speech_q.put(text)
 
     # Speak the given text
@@ -259,4 +272,3 @@ if __name__ == '__main__':
     # b.read_full_article(2)
 
 
-    

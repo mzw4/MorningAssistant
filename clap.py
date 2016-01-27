@@ -36,10 +36,11 @@ class ClapDetector():
 
         self.analysis_q = Queue()
         self._stop_analysis = threading.Event()
-        self.analysis_thread = threading.Thread(target=self.analyze, args=(self.analysis_q))
+        self.analysis_thread = None
 
         # recording parameters
-        self.WINDOW_SIZE_SEC = 0.5
+        self.WINDOW_SIZE_SEC = 1
+        self.WINDOW_STEP_SEC = 0.1
         self.CHUNK = 8192
         self.FORMAT = pyaudio.paInt16
         self.CHANNELS = 1
@@ -82,7 +83,8 @@ class ClapDetector():
         return self.thread.is_alive()
 
     def run(self):
-        self.listen()
+        self.listen_moving()
+        # self.listen()
 
     def init_audio_steam(self):
         self.p = pyaudio.PyAudio()
@@ -99,27 +101,27 @@ class ClapDetector():
             self.stream.close()
         self.p.terminate()
 
-    """
-    Continuously records audio listening for a clap
-    Stops thread on detection
-    """
-    def listen(self):
-        self.init_audio_steam()
-        print "Clap detection initialized"
-        try:
-            while not self._stop.is_set():
-                # record claps and get frequencies
-                frame_data = self.record(self.record_window)
+    # """
+    # Continuously records audio listening for a clap
+    # Stops thread on detection
+    # """
+    # def listen(self):
+    #     self.init_audio_steam()
+    #     print "Clap detection initialized"
+    #     try:
+    #         while not self._stop.is_set():
+    #             # record claps and get frequencies
+    #             frame_data = self.record(self.record_window)
 
-                clap = self.check_clap(frame_data)
-                if clap:
-                    print 'Clapped'
-                    self.thread_queue.put('clap')
-                    self.stop()
+    #             clap = self.check_clap(frame_data)
+    #             if clap:
+    #                 print 'Clapped'
+    #                 self.thread_queue.put('clap')
+    #                 self.stop()
 
-        except (KeyboardInterrupt, SystemExit):
-            print "\rExiting clap"
-            self.terminate_audio_stream()
+    #     except (KeyboardInterrupt, SystemExit):
+    #         print "\rExiting clap"
+    #         self.terminate_audio_stream()
 
     """
     Record audio for the specified number of seconds
@@ -127,7 +129,7 @@ class ClapDetector():
     def record(self, seconds):
         print '######## Recording...'
         self.init_audio_steam()
-        data = array.array('h')            
+        data = array.array('h')
         try:
             for _ in np.arange(int(self.RATE / self.CHUNK * seconds)):
                 data.fromstring(self.stream.read(self.CHUNK))
@@ -139,9 +141,55 @@ class ClapDetector():
         print 'got %s bytes' % data_arr.size
         return data_arr
 
-    def analyze(self):
-        pass
-        
+
+    """
+    Continuously records audio listening for a clap
+    Stops thread on detection
+    """
+    def listen_moving(self):
+        self.init_audio_steam()
+        self.thread_queue.queue.clear()
+        self.analysis_q.queue.clear()
+        print "Clap detection initialized"
+        num_frames = int(self.RATE/self.CHUNK * self.WINDOW_SIZE_SEC)
+        frames = [np.zeros(self.CHUNK) for _ in range(num_frames)]
+        last_checked = None
+        try:
+            while not self._stop.is_set():
+                data = array.array('h')
+                try:
+                    data.fromstring(self.stream.read(self.CHUNK))
+                except IOError:
+                    print 'Stream error'
+                    sys.exit(0)
+                frames.append(np.array(data, dtype=np.int16))
+                frames.pop(0)
+
+                now = datetime.datetime.now()
+                if (not last_checked or now - last_checked > datetime.timedelta(seconds=self.WINDOW_STEP_SEC))\
+                    and (not self.analysis_thread or not self.analysis_thread.is_alive()):
+                    self.analysis_thread = threading.Thread(target=self.analyze, args=(frames,))
+                    self.analysis_thread.start()
+                    last_checked = now
+
+                if not self.analysis_q.empty() and self.analysis_q.get() == 'clap':
+                    self.thread_queue.put('clap')
+                    self.stop()
+        except (KeyboardInterrupt, SystemExit):
+            print "\rExiting clap"
+            self.terminate_audio_stream()
+
+    def analyze(self, frames):
+        # clocked in at < 0.006 sec
+        # start = datetime.datetime.now()
+        print 'Analyzing...'
+        data = np.array(frames).flatten()
+        clap = self.check_clap(data)
+        if clap:
+            print 'Clapped!!!!'
+            self.analysis_q.put('clap')
+        # print (datetime.datetime.now() - start).total_seconds()
+
     """
     Compare the audio stream data to a clap waveform
     Could use ML for this
@@ -407,6 +455,7 @@ class ClapDetector():
 if __name__ == '__main__':
     # ClapDetector(Queue()).train_claps(samples=20)
     # ClapDetector(Queue()).train_noclaps(samples=20)
-    ClapDetector(Queue()).listen()
     # ClapDetector(Queue()).train_model()
+    # ClapDetector(Queue()).listen()
+    ClapDetector(Queue()).listen_moving()
 
