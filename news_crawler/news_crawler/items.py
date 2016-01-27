@@ -7,8 +7,14 @@
 
 import scrapy
 
-class ArticleItem(scrapy.Item):
+class CnnArticleItem(scrapy.Item):
     title = scrapy.Field()
     developments = scrapy.Field()
     body = scrapy.Field()
     date = scrapy.Field()
+
+class GoogleArticleItem(scrapy.Item):
+    title = scrapy.Field()
+    date = scrapy.Field()
+    snippet = scrapy.Field()
+    source = scrapy.Field()

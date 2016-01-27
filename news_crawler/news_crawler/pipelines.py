@@ -19,3 +19,6 @@ class NewsJsonOutputPipeline(object):
         line = json.dumps(dict(item)) + '\n'
         self.file.write(line)
         return item
+
+    def close_spider(self, spider):
+        self.file.close()

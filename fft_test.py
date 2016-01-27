@@ -1,26 +1,35 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-Fs = 2000            # Sampling frequency
+Fs = 1000            # Sampling frequency
 T = 1.0/Fs             # Sampling period
-t = np.arange(1000)*T        # Time vector
+L = 1000
+t = np.arange(L)*T        # Time vector
 
-S = 0.7*np.sin(2*np.pi*50*t) + np.sin(2*np.pi*120*t);
+S = 0.7 * np.sin(2*np.pi*50*t) + np.sin(2*np.pi*120*t)
 
 sp = np.fft.fft(S)
-freqs = np.fft.fftfreq(S.size)
+
+# matplot lib example
+P2 = np.abs(sp/L);
+P1 = P2[:L/2];
+P1[2:-1] = 2*P1[2:-1];
+f = Fs*np.arange(L/2)/L;
+plt.plot(f,P1)
+plt.show()
+
+
+
+freqs = np.fft.fftfreq(S.size, d=1.0/Fs)
 print(freqs.min(), freqs.max())
 
 idx = np.argmax(np.abs(sp))
 print idx
 freq = freqs[idx]
-freq_in_hertz = abs(freq * 1000)
-
-# freq_in_hertz = abs(freqs[12] * Fs)
-print freq_in_hertz
+print freq
 
 # plt.plot(t, S, color='r')
-plt.plot(t, sp, color='r')
+plt.plot(freqs, np.abs(sp.real), color='r')
 # plt.plot(t, freq_in_hertz, color='r')
 # plt.plot(freq_in_hertz, sp, color='b')
 plt.show()
