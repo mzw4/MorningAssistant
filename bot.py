@@ -11,6 +11,7 @@ import speech_recognition as sr
 
 from voice import VoiceInputParser
 from clap import ClapDetector
+from weather import Weather
 
 SPEAK_COMMAND = 'say'
 VOICE = '-v Alex'
@@ -42,6 +43,8 @@ class Bot():
         self.alarm_index = 0
         self.cur_alarm_process = None
         self.state = States.Idle
+
+        self.weather = Weather()
 
     """
     Runs the robot state machine
@@ -120,6 +123,11 @@ class Bot():
             self.state = States.Speaking
         elif response == 'are you a robot':
             self.queue_speech('Yes')
+            self.state = States.Speaking
+
+        elif 'weather' in response:
+            tomorrow = 'tomorrow' in response
+            self.queue_speech(self.weather.get_weather(tomorrow))
             self.state = States.Speaking
 
         if 'news' in response:
